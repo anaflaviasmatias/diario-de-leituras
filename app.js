@@ -514,7 +514,14 @@
   $('#sort').addEventListener('change', e => { state.sort = e.target.value; saveUi(); renderShelf(); });
   $('#year').addEventListener('change', e => { state.year = Number(e.target.value); saveUi(); renderShelf(); if (state.tab === 'year') renderYear(); });
   $('#addBtn').addEventListener('click', addBook);
-  $('#logout').addEventListener('click', async () => { flushAll(); await sb.auth.signOut(); });
+  $('#logout').addEventListener('click', async () => {
+    flushAll();
+    try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
+    // garante a volta para a tela de entrada mesmo se o aviso do Supabase não chegar
+    if (state.channel) { try { sb.removeChannel(state.channel); } catch (e) {} state.channel = null; }
+    state.user = null; state.books = new Map(); closeBook(); showLogin();
+    $('#password').value = ''; loginMsg('');
+  });
 
   /* ---------- entrada ---------- */
   let mode = 'login';
