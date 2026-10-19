@@ -207,3 +207,22 @@ img{max-width:100%}
   .v-status{align-self:center}
   .v-body{padding:16px 18px calc(28px + env(safe-area-inset-bottom,0px))}
 }
+
+/* estrelas com meia */
+.st{position:relative;display:inline-block;color:var(--star-off);line-height:1}
+.st-fill{position:absolute;left:0;top:0;overflow:hidden;white-space:nowrap;color:var(--star)}
+.mini-stars{gap:1px}
+.v-stars .st{font-size:22px}
+.rate{gap:4px}
+.rate-star{position:relative;display:inline-block;font-size:32px;line-height:1}
+.rate-star .half{position:absolute;top:0;bottom:0;width:50%;background:none;border:0;padding:0;cursor:pointer}
+.rate-star .half.l{left:0}
+.rate-star .half.r{right:0}
+.rate-star .half:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:4px}
+
+/* frases marcantes */
+.qall{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.qitem{margin:0;background:var(--pink-soft);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.qitem blockquote{margin:0;font-family:var(--f-display);font-style:italic;font-size:19px;line-height:1.4;color:var(--fg);white-space:pre-wrap}
+.qitem figcaption{font-size:12.5px;color:var(--muted)}
+.qitem .linkish{font-size:12.5px;font-weight:600}

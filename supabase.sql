@@ -7,7 +7,7 @@ create table if not exists public.books (
   title       text not null default '',
   author      text not null default '',
   status      text not null default 'lido',
-  rating      int  not null default 0,
+  rating      numeric(2,1) not null default 0,
   summary     text not null default '',
   notes       text not null default '',
   quotes      jsonb not null default '[]'::jsonb,
@@ -54,3 +54,6 @@ create policy "trocar minhas capas" on storage.objects for update to authenticat
   using (bucket_id = 'capas' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "apagar minhas capas" on storage.objects for delete to authenticated
   using (bucket_id = 'capas' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 4. Meia estrela (para bancos criados antes desta mudança)
+alter table public.books alter column rating type numeric(2,1);

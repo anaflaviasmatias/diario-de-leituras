@@ -35,7 +35,7 @@
   // linha do banco <-> objeto usado na tela
   const COLS = { order: 'ord', coverUrl: 'cover_url' };
   function fromRow(r) {
-    return { id: r.id, title: r.title || '', author: r.author || '', status: r.status || 'lido', rating: r.rating || 0,
+    return { id: r.id, title: r.title || '', author: r.author || '', status: r.status || 'lido', rating: Number(r.rating) || 0,
       summary: r.summary || '', notes: r.notes || '', quotes: Array.isArray(r.quotes) ? r.quotes : [], started: r.started || '', finished: r.finished || '',
       pages: r.pages, genre: r.genre || '', format: r.format || '', year: r.year, order: r.ord, coverUrl: r.cover_url || '' };
   }
@@ -71,11 +71,18 @@
     return c;
   }
   function placeholder(b) { return h('div', { class: 'ph' }, b.title || 'Sem título', h('small', { text: b.author || '' })); }
-  function miniStars(n) {
-    const w = h('div', { class: 'mini-stars', 'aria-label': n ? n + ' de 5 estrelas' : 'sem nota' });
-    for (let i = 1; i <= 5; i++) w.append(h('span', { class: i <= n ? '' : 'off', text: '★' }));
+  const fmtNota = r => String(r).replace('.', ',');
+  const notaLabel = r => !r ? '' : Number.isInteger(r) ? NOTAS[r] : fmtNota(r) + ' de 5';
+  // uma estrela que pode estar cheia, pela metade ou vazia
+  function star(fill) {
+    return h('span', { class: 'st', 'aria-hidden': 'true' }, '★', h('span', { class: 'st-fill', style: `width:${fill * 100}%`, text: '★' }));
+  }
+  function starsRow(r, cls) {
+    const w = h('div', { class: cls, 'aria-label': r ? fmtNota(r) + ' de 5 estrelas' : 'sem nota' });
+    for (let i = 1; i <= 5; i++) w.append(star(Math.max(0, Math.min(1, r - (i - 1)))));
     return w;
   }
+  function miniStars(n) { return starsRow(n || 0, 'mini-stars'); }
   let toastT;
   function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2800); }
   function notice(msg) { const n = $('#notice'); n.textContent = msg || ''; n.hidden = !msg; }
@@ -201,12 +208,12 @@
     const pMonth = h('div', { class: 'panel' }, h('h3', { text: 'Livros por mês' }), months,
       noDate ? h('div', { class: 'note', text: `${noDate} ${noDate === 1 ? 'livro ainda sem' : 'livros ainda sem'} data de término. Preencha na ficha para aparecer no gráfico.` }) : null);
 
-    const dist = [5,4,3,2,1].map(n => [n, rated.filter(b => b.rating === n).length]);
+    const dist = [5,4,3,2,1].map(n => [n, rated.filter(b => Math.floor(b.rating) === n || (n === 1 && b.rating < 1)).length]);
     const dmax = Math.max(1, ...dist.map(d => d[1]));
     const pRate = h('div', { class: 'panel' }, h('h3', { text: 'Notas' }),
       dist.map(([n, c]) => h('div', { class: 'rrow' }, h('span', { text: '★'.repeat(n), style: 'color:var(--star);letter-spacing:-1px;font-size:12px' }),
         h('div', { class: 'rtrack' }, h('div', { class: 'rfill', style: `width:${c / dmax * 100}%` })), h('span', { class: 'c', text: c }))),
-      rated.length < read.length ? h('div', { class: 'note', text: `${read.length - rated.length} ${read.length - rated.length === 1 ? 'livro' : 'livros'} sem nota.` }) : null);
+      h('div', { class: 'note', text: 'Notas com meia estrela entram na linha de baixo (4,5 conta em 4).' + (rated.length < read.length ? ` ${read.length - rated.length} ${read.length - rated.length === 1 ? 'livro' : 'livros'} sem nota.` : '') }));
 
     const aut = new Map(); for (const b of read) if (b.author) aut.set(b.author, (aut.get(b.author) || 0) + 1);
     const top = [...aut.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR')).slice(0, 6);
@@ -218,11 +225,14 @@
       favs.length ? h('div', { class: 'favs' }, favs.map(b => h('button', { class: 'book', type: 'button', onclick: () => openBook(b.id), 'aria-label': b.title }, coverEl(b))))
         : h('p', { class: 'note', text: 'Os livros com 5 estrelas aparecem aqui.' }));
 
-    const allQ = read.flatMap(b => (b.quotes || []).map(q => ({ q, b })));
-    const one = allQ.length ? allQ[Math.floor(Math.random() * allQ.length)] : null;
-    const pQuote = h('div', { class: 'panel' }, h('h3', { text: 'Uma frase sua' }),
-      one ? [h('p', { class: 'quote-of', text: '“' + one.q.text + '”' }), h('div', { class: 'quote-src', text: one.b.title + (one.b.author ? ', ' + one.b.author : '') + (one.q.page ? ', p. ' + one.q.page : '') })]
-        : h('p', { class: 'note', text: 'Quando você guardar frases nas fichas, uma delas aparece aqui a cada visita.' }));
+    const yearBooks = sorted(list().filter(b => yearOf(b) === y && (b.quotes || []).length));
+    const allQ = yearBooks.flatMap(b => b.quotes.map(q => ({ q, b })));
+    const pQuote = h('div', { class: 'panel' }, h('h3', { text: 'Frases marcantes' }),
+      allQ.length ? h('div', { class: 'qall' }, allQ.map(({ q, b }) => h('figure', { class: 'qitem' },
+          h('blockquote', { text: '“' + q.text + '”' }),
+          h('figcaption', {}, h('button', { class: 'linkish', type: 'button', onclick: () => openBook(b.id), text: b.title || 'Sem título' }),
+            (b.author ? ', ' + b.author : '') + (q.page ? ', p. ' + q.page : '')))))
+        : h('p', { class: 'note', text: 'As frases que você guardar nas fichas dos livros aparecem aqui.' }));
 
     v.append(h('div', { class: 'panels' }, pMonth, pRate));
     v.append(h('div', { class: 'panels', style: 'margin-top:16px' }, pFav, pAut));
@@ -245,9 +255,8 @@
       h('button', { class: 'btn small', type: 'button', onclick: () => openBook(b.id, true), text: 'Editar' }),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Fechar', onclick: closeBook, text: '×' }));
 
-    const stars = h('div', { class: 'v-stars', 'aria-label': b.rating ? b.rating + ' de 5 estrelas' : 'sem nota' },
-      [1,2,3,4,5].map(n => h('span', { class: n <= (b.rating || 0) ? 'on' : '', text: '★' })),
-      b.rating ? h('span', { class: 'lbl', text: NOTAS[b.rating] }) : h('span', { class: 'lbl', text: 'Sem nota' }));
+    const stars = starsRow(b.rating || 0, 'v-stars');
+    stars.append(h('span', { class: 'lbl', text: b.rating ? notaLabel(b.rating) : 'Sem nota' }));
 
     const meta = [];
     if (b.started) meta.push(['Comecei', fmtDate(b.started)]);
@@ -312,8 +321,12 @@
     drawSeg();
 
     const rate = h('div', { class: 'rate', role: 'group', 'aria-label': 'Nota' });
-    const drawRate = () => rate.replaceChildren(...[1,2,3,4,5].map(n => h('button', { type: 'button', class: n <= (b.rating || 0) ? 'on' : '', 'aria-label': n + (n === 1 ? ' estrela' : ' estrelas'),
-      onclick: () => { patch(b.id, { rating: b.rating === n ? 0 : n }, 0); drawRate(); }, text: '★' })), h('span', { class: 'lbl', text: NOTAS[b.rating || 0] || 'Toque para dar nota' }));
+    const setRate = v => { patch(b.id, { rating: b.rating === v ? 0 : v }, 0); drawRate(); };
+    const drawRate = () => rate.replaceChildren(...[1,2,3,4,5].map(n => h('span', { class: 'rate-star' },
+        star(Math.max(0, Math.min(1, (b.rating || 0) - (n - 1)))),
+        h('button', { type: 'button', class: 'half l', 'aria-label': fmtNota(n - 0.5) + ' estrelas', onclick: () => setRate(n - 0.5) }),
+        h('button', { type: 'button', class: 'half r', 'aria-label': n + (n === 1 ? ' estrela' : ' estrelas'), onclick: () => setRate(n) }))),
+      h('span', { class: 'lbl', text: notaLabel(b.rating || 0) || 'Toque na metade da estrela para dar meia' }));
     drawRate();
 
     const fld = (id, label, type, key, extra = {}) => {
