@@ -230,15 +230,67 @@
   }
 
   /* ---------- ficha do livro ---------- */
-  function openBook(id) {
+  const fmtDate = s => { if (!s) return ''; const [y, m, d] = s.split('-'); return d && m ? `${d}/${m}/${y}` : s; };
+  function paragraphs(text) {
+    return String(text || '').split(/\n\s*\n|\n/).map(t => t.trim()).filter(Boolean).map(t => h('p', { text: t }));
+  }
+  function showSheet(sheet) {
+    const scrim = $('#scrim'); scrim.replaceChildren(sheet); scrim.hidden = false; scrim.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+  }
+
+  // ficha em modo leitura: o card do livro
+  function viewBook(b) {
+    const top = h('div', { class: 'sheet-top' },
+      h('button', { class: 'btn small', type: 'button', onclick: () => openBook(b.id, true), text: 'Editar' }),
+      h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Fechar', onclick: closeBook, text: '×' }));
+
+    const stars = h('div', { class: 'v-stars', 'aria-label': b.rating ? b.rating + ' de 5 estrelas' : 'sem nota' },
+      [1,2,3,4,5].map(n => h('span', { class: n <= (b.rating || 0) ? 'on' : '', text: '★' })),
+      b.rating ? h('span', { class: 'lbl', text: NOTAS[b.rating] }) : h('span', { class: 'lbl', text: 'Sem nota' }));
+
+    const meta = [];
+    if (b.started) meta.push(['Comecei', fmtDate(b.started)]);
+    if (b.finished) meta.push(['Terminei', fmtDate(b.finished)]);
+    if (b.pages) meta.push(['Páginas', String(b.pages)]);
+    if (b.genre) meta.push(['Gênero', b.genre]);
+    if (b.format) meta.push(['Como li', b.format]);
+    if (b.order && b.status !== 'quero') meta.push(['Nº na ordem', String(b.order)]);
+
+    const section = (label, body) => h('section', { class: 'v-sec' }, h('h3', { class: 'sec-h', text: label }), body);
+    const qs = b.quotes || [];
+    const hasText = b.summary || b.notes || qs.length;
+
+    const head = h('div', { class: 'v-head' },
+      h('div', { class: 'v-cover' }, coverEl(b)),
+      h('div', { class: 'v-id' },
+        h('span', { class: 'v-status s-' + (b.status || 'lido'), text: STATUS[b.status] || 'Lido' }),
+        h('h2', { class: 'v-title', text: b.title || 'Sem título' }),
+        b.author ? h('div', { class: 'v-author', text: b.author }) : null,
+        b.status === 'quero' ? null : stars));
+
+    const body = h('div', { class: 'v-body' },
+      meta.length ? h('dl', { class: 'v-meta' }, meta.map(([k, v]) => h('div', {}, h('dt', { text: k }), h('dd', { text: v })))) : null,
+      b.summary ? section('Resumo da história', h('div', { class: 'v-text' }, paragraphs(b.summary))) : null,
+      qs.length ? section('Frases favoritas', h('div', { class: 'quotes' }, qs.map(q => h('blockquote', { class: 'q' },
+        h('p', { text: q.text }), q.page ? h('div', { class: 'pg', text: 'p. ' + q.page }) : null)))) : null,
+      b.notes ? section('O que eu achei', h('div', { class: 'v-text' }, paragraphs(b.notes))) : null,
+      hasText ? null : h('div', { class: 'v-empty' },
+        h('p', { text: 'Você ainda não escreveu nada sobre este livro.' }),
+        h('button', { class: 'btn ghost small', type: 'button', onclick: () => openBook(b.id, true), text: 'Escrever resumo e impressões' })));
+
+    showSheet(h('div', { class: 'sheet view', role: 'dialog', 'aria-modal': 'true', 'aria-label': b.title || 'Livro' }, top, head, body));
+  }
+
+  function openBook(id, edit = false) {
     const b = state.books.get(id); if (!b) return;
-    state.openId = id;
-    const scrim = $('#scrim'); scrim.replaceChildren();
-    const sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': b.title || 'Livro' });
+    state.openId = id; state.editing = edit;
+    if (!edit) { viewBook(b); return; }
+    const sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Editando ' + (b.title || 'livro') });
 
     const top = h('div', { class: 'sheet-top' },
       h('span', { class: 'saved', id: 'savedLbl', text: 'As alterações são salvas sozinhas' }),
-      h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Fechar', onclick: closeBook, text: '×' }));
+      h('button', { class: 'btn small', type: 'button', onclick: () => { flushAll(); openBook(b.id, false); }, text: 'Concluir' }));
 
     const coverBox = h('div', { id: 'coverBox' }, coverEl(b));
     const file = h('input', { type: 'file', accept: 'image/*', class: 'sr', id: 'coverFile', onchange: e => changeCover(b.id, e.target.files[0]) });
@@ -322,9 +374,7 @@
       dz);
 
     sheet.append(top, h('div', { class: 'sheet-body' }, side, main));
-    scrim.append(sheet);
-    scrim.hidden = false;
-    document.body.style.overflow = 'hidden';
+    showSheet(sheet);
     requestAnimationFrame(fit);
     if (!b.title) title.focus();
   }
@@ -333,7 +383,7 @@
     state.openId = null; $('#scrim').hidden = true; $('#scrim').replaceChildren(); document.body.style.overflow = '';
   }
   $('#scrim').addEventListener('click', e => { if (e.target.id === 'scrim') closeBook(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.openId) closeBook(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && state.openId) { if (state.editing) { flushAll(); openBook(state.openId, false); } else closeBook(); } });
 
   function nextOrder() {
     const y = Number(state.year);
@@ -347,7 +397,7 @@
     const { data: rows, error } = await sb.from('books').insert(toRow(data)).select();
     if (error || !rows || !rows[0]) { toast('Não foi possível criar o livro agora.'); return; }
     const b = fromRow(rows[0]); state.books.set(b.id, b);
-    renderShelf(); openBook(b.id);
+    renderShelf(); openBook(b.id, true);
   }
 
   async function removeBook(id) {
@@ -423,7 +473,7 @@
         else {
           const r = payload.new; if (pending.has(r.id) || writing.has(r.id)) return;
           const obj = state.books.get(r.id) || {}; state.books.set(r.id, Object.assign(obj, fromRow(r)));
-          if (state.openId === r.id) return; // não mexe na ficha aberta
+          if (state.openId === r.id) { if (!state.editing) viewBook(state.books.get(r.id)); return; } // não mexe na ficha em edição
         }
         renderShelf(); if (state.tab === 'year') renderYear();
       })

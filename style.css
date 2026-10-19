@@ -173,3 +173,37 @@ img{max-width:100%}
 .linkish{background:none;border:0;color:var(--accent);font-weight:600;padding:0;text-decoration:underline;text-underline-offset:3px}
 .foot{margin-top:40px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:16px}
 .import{display:flex;flex-direction:column;align-items:center;gap:12px}
+
+/* ficha em modo leitura */
+.sheet.view{max-width:720px}
+.sheet.view .sheet-top{justify-content:space-between}
+.v-head{display:grid;grid-template-columns:160px minmax(0,1fr);gap:24px;align-items:end;padding:26px 26px 6px}
+.v-cover .cover{width:100%}
+.v-id{display:flex;flex-direction:column;gap:8px;min-width:0}
+.v-title{font-family:var(--f-display);font-weight:600;font-size:clamp(28px,5vw,38px);line-height:1.08;color:var(--heading);margin:0;text-wrap:balance}
+.v-author{font-size:16px;color:var(--muted)}
+.v-status{align-self:flex-start;font-size:12px;font-weight:600;letter-spacing:.04em;border-radius:999px;padding:3px 10px;background:var(--chip);color:var(--fg)}
+.v-status.s-lendo{background:var(--pink);color:#3F2117}
+.v-status.s-lido{background:var(--accent-soft);color:var(--heading)}
+.v-stars{display:flex;align-items:center;gap:2px;font-size:22px;line-height:1;color:var(--star-off);margin-top:4px}
+.v-stars .on{color:var(--star)}
+.v-stars .lbl{font-size:13px;color:var(--muted);margin-left:8px}
+.v-body{padding:18px 26px 30px;display:flex;flex-direction:column;gap:26px}
+.v-meta{display:flex;flex-wrap:wrap;gap:10px 28px;margin:0;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.v-meta div{display:flex;flex-direction:column;gap:2px}
+.v-meta dt{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.v-meta dd{margin:0;font-size:15px;font-variant-numeric:tabular-nums}
+.v-sec{display:flex;flex-direction:column;gap:10px}
+.v-sec .sec-h{margin:0}
+.v-text p{margin:0 0 12px;font-size:16px;line-height:1.7;max-width:62ch}
+.v-text p:last-child{margin-bottom:0}
+.v-sec blockquote.q{margin:0;padding-right:16px}
+.v-empty{display:flex;flex-direction:column;align-items:flex-start;gap:10px;color:var(--muted);padding:6px 0}
+.v-empty p{margin:0}
+@media (max-width:600px){
+  .v-head{grid-template-columns:1fr;justify-items:center;text-align:center;padding:22px 18px 4px;gap:18px}
+  .v-cover{width:150px}
+  .v-id{align-items:center}
+  .v-status{align-self:center}
+  .v-body{padding:16px 18px calc(28px + env(safe-area-inset-bottom,0px))}
+}
