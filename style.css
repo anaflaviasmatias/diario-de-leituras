@@ -257,3 +257,18 @@ img{max-width:100%}
 @media (prefers-reduced-motion:reduce){.steam{animation:none}}
 @media (min-width:601px){.hero-art{left:30%}}
 @media (max-width:600px){.hero-art{left:auto;right:-120px;width:620px}}
+
+/* tipografia: Sora em tudo */
+:root{--f-display:"Sora", "Segoe UI", system-ui, -apple-system, sans-serif;--f-body:"Sora", "Segoe UI", system-ui, -apple-system, sans-serif}
+body{font-size:14.5px;letter-spacing:-.005em}
+.brand h1,.login-card h1{font-weight:600;letter-spacing:-.03em;font-size:clamp(30px,5.4vw,42px)}
+.brand h1 em,.login-card h1 em{font-style:normal;font-weight:300;color:var(--accent)}
+.v-title,.title-in{font-weight:600;letter-spacing:-.025em}
+.v-title{font-size:clamp(24px,4.6vw,32px)}
+.title-in{font-size:28px}
+.panel h3,.empty h3{font-weight:600;letter-spacing:-.02em;font-size:18px}
+.stat .v{font-weight:300;letter-spacing:-.03em;font-size:36px}
+.cover .ph{font-weight:600;font-size:15px;letter-spacing:-.01em}
+.q p,.qitem blockquote,.quote-of{font-style:normal;font-weight:300;font-size:16.5px;line-height:1.55;letter-spacing:-.005em}
+.book .t{font-size:13px;letter-spacing:-.01em}
+.v-text p{font-size:15px;line-height:1.75}
