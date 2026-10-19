@@ -26,11 +26,15 @@
 
   const state = {
     books: new Map(), loaded: false, user: null, channel: null,
+    ownerId: null, owner: null, me: null, social: false, following: new Set(), people: [], editing: false,
     tab: 'shelf', filter: 'lido', sort: 'order', year: thisYear, openId: null,
   };
   try { const s = JSON.parse(localStorage.getItem('dl-ui') || '{}'); Object.assign(state, pick(s, ['tab','filter','sort','year'])); } catch (e) {}
   function pick(o, ks) { const r = {}; for (const k of ks) if (o[k] != null) r[k] = o[k]; return r; }
   function saveUi() { try { localStorage.setItem('dl-ui', JSON.stringify(pick(state, ['tab','filter','sort','year']))); } catch (e) {} }
+
+  const readonly = () => !!(state.user && state.ownerId && state.ownerId !== state.user.id);
+  const firstName = p => ((p && p.name) || '').trim().split(/\s+/)[0] || (p && p.username) || '';
 
   // linha do banco <-> objeto usado na tela
   const COLS = { order: 'ord', coverUrl: 'cover_url' };
@@ -98,6 +102,7 @@
   /* ---------- gravação com fila por livro ---------- */
   const pending = new Map(); const timers = new Map(); const writing = new Set();
   function patch(id, data, delay = 650) {
+    if (readonly()) return;
     const b = state.books.get(id); if (!b) return;
     Object.assign(b, data);
     pending.set(id, Object.assign(pending.get(id) || {}, data));
@@ -129,7 +134,7 @@
   }
   function flushAll() { for (const id of [...pending.keys()]) { clearTimeout(timers.get(id)); timers.delete(id); flush(id); } }
   window.addEventListener('online', flushAll);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAll(); else if (state.user) refresh(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushAll(); else if (state.user && state.ownerId) refresh(); });
   window.addEventListener('pagehide', flushAll);
   function setSaved(t) { const s = $('#savedLbl'); if (s) s.textContent = t; }
 
@@ -151,7 +156,7 @@
     const read = counts.lido;
     $('#subtitle').textContent = state.loaded
       ? (read ? `${read} ${read === 1 ? 'livro lido' : 'livros lidos'} em ${y}` + (counts.lendo ? ` · ${counts.lendo} em andamento` : '') : `Nenhum livro marcado como lido em ${y} ainda.`)
-      : 'Carregando sua estante…';
+      : (readonly() ? 'Carregando a estante…' : 'Carregando sua estante…');
   }
   function renderYears() {
     const ys = new Set([thisYear]);
@@ -172,13 +177,14 @@
     empty.hidden = items.length > 0 || !state.loaded;
     if (!items.length && state.loaded) {
       if (!state.books.size) {
-        empty.replaceChildren(h('div', { class: 'import' },
-          h('h3', { text: 'Sua estante está vazia' }),
-          h('p', { text: 'Traga os livros que você já tinha cadastrado, com capas e ordem de leitura.' }),
-          h('button', { class: 'btn', type: 'button', id: 'importBtn', onclick: importSeed, text: 'Importar meus livros' }),
-          h('p', { class: 'saved', text: 'Ou comece do zero com “+ Livro”.' })));
+        empty.replaceChildren(readonly()
+          ? h('div', {}, h('h3', { text: 'Estante vazia por enquanto' }), h('p', { text: firstName(state.owner) + ' ainda não adicionou livros.' }))
+          : h('div', { class: 'import' }, h('h3', { text: 'Sua estante está vazia' }),
+              h('p', { text: 'Toque em “+ Livro” para registrar sua primeira leitura.' }),
+              h('button', { class: 'btn', type: 'button', onclick: addBook, text: '+ Livro' })));
         return;
       }
+      if (readonly()) { empty.replaceChildren(h('h3', { text: 'Nada por aqui' }), h('p', { text: 'Nenhum livro nesta lista.' })); return; }
       const msg = state.filter === 'quero' ? ['Lista de desejos vazia', 'Adicione livros que você quer ler com “+ Livro” e marque como “Quero ler”.']
         : state.filter === 'lendo' ? ['Nenhuma leitura em andamento', 'Quando começar um livro, adicione com “+ Livro” e marque como “Lendo”.']
         : ['Nada por aqui em ' + state.year, 'Toque em “+ Livro” para registrar uma leitura.'];
@@ -260,7 +266,7 @@
   // ficha em modo leitura: o card do livro
   function viewBook(b) {
     const top = h('div', { class: 'sheet-top' },
-      h('button', { class: 'btn small', type: 'button', onclick: () => openBook(b.id, true), text: 'Editar' }),
+      readonly() ? h('span', { class: 'saved', text: 'Estante de ' + firstName(state.owner) }) : h('button', { class: 'btn small', type: 'button', onclick: () => openBook(b.id, true), text: 'Editar' }),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Fechar', onclick: closeBook, text: '×' }));
 
     const stars = starsRow(b.rating || 0, 'v-stars');
@@ -292,15 +298,17 @@
       qs.length ? section('Frases favoritas', h('div', { class: 'quotes' }, qs.map(q => h('blockquote', { class: 'q' },
         h('p', { text: q.text }), q.page ? h('div', { class: 'pg', text: 'p. ' + q.page }) : null)))) : null,
       b.notes ? section('O que eu achei', h('div', { class: 'v-text' }, paragraphs(b.notes))) : null,
-      hasText ? null : h('div', { class: 'v-empty' },
-        h('p', { text: 'Você ainda não escreveu nada sobre este livro.' }),
-        h('button', { class: 'btn ghost small', type: 'button', onclick: () => openBook(b.id, true), text: 'Escrever resumo e impressões' })));
+      hasText ? null : h('div', { class: 'v-empty' }, readonly()
+        ? h('p', { text: 'Ainda não há resumo nem impressões deste livro.' })
+        : [h('p', { text: 'Você ainda não escreveu nada sobre este livro.' }),
+           h('button', { class: 'btn ghost small', type: 'button', onclick: () => openBook(b.id, true), text: 'Escrever resumo e impressões' })]));
 
     showSheet(h('div', { class: 'sheet view', role: 'dialog', 'aria-modal': 'true', 'aria-label': b.title || 'Livro' }, top, head, body));
   }
 
   function openBook(id, edit = false) {
     const b = state.books.get(id); if (!b) return;
+    if (readonly()) edit = false;
     state.openId = id; state.editing = edit;
     if (!edit) { viewBook(b); return; }
     const sheet = h('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Editando ' + (b.title || 'livro') });
@@ -412,6 +420,7 @@
   }
 
   async function addBook() {
+    if (readonly()) return;
     const status = state.filter === 'quero' ? 'quero' : state.filter === 'lido' ? 'lido' : 'lendo';
     const data = { title: '', author: '', status, rating: 0, summary: '', notes: '', quotes: [], started: '', finished: '', pages: null, genre: '', format: '',
       year: status === 'quero' ? null : Number(state.year), order: status === 'quero' ? null : nextOrder(), coverUrl: '' };
@@ -456,25 +465,12 @@
     });
   }
 
-  async function importSeed() {
-    const btn = $('#importBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Importando…'; }
-    try {
-      const seed = await (await fetch('seed.json', { cache: 'no-store' })).json();
-      const base = new URL('.', location.href).href;
-      const rows = seed.map(r => Object.assign({}, r, { cover_url: r.cover_url && !/^https?:/.test(r.cover_url) ? base + r.cover_url : r.cover_url }));
-      const { error } = await sb.from('books').insert(rows);
-      if (error) throw error;
-      await refresh(); toast(rows.length + ' livros importados');
-    } catch (e) {
-      toast('Não foi possível importar agora.');
-      if (btn) { btn.disabled = false; btn.textContent = 'Importar meus livros'; }
-    }
-  }
-
   /* ---------- carregar e sincronizar ---------- */
   async function refresh() {
-    const { data, error } = await sb.from('books').select('*').order('ord', { ascending: true, nullsFirst: false });
-    if (error) { notice('Não consegui carregar sua estante. Confira a internet e abra o app de novo.'); state.loaded = true; renderShelf(); return; }
+    const owner = state.ownerId || state.user.id;
+    const { data, error } = await sb.from('books').select('*').eq('user_id', owner).order('ord', { ascending: true, nullsFirst: false });
+    if (owner !== (state.ownerId || state.user.id)) return; // trocou de perfil no meio do caminho
+    if (error) { notice('Não consegui carregar a estante. Confira a internet e abra o app de novo.'); state.loaded = true; renderShelf(); return; }
     notice('');
     const next = new Map();
     for (const r of data) {
@@ -490,6 +486,7 @@
     if (state.channel) sb.removeChannel(state.channel);
     state.channel = sb.channel('books-' + state.user.id)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'books', filter: 'user_id=eq.' + state.user.id }, payload => {
+        if (readonly()) return;
         if (payload.eventType === 'DELETE') { state.books.delete(payload.old.id); }
         else {
           const r = payload.new; if (pending.has(r.id) || writing.has(r.id)) return;
@@ -501,16 +498,183 @@
       .subscribe();
   }
 
+  /* ---------- perfis, pessoas e seguir ---------- */
+  const USER_RE = /^[a-z0-9_.]{3,20}$/;
+  const avatar = (p, big) => h('span', { class: 'avatar' + (big ? ' big' : ''), 'aria-hidden': 'true', text: ((p && (p.name || p.username)) || '?').trim().charAt(0).toUpperCase() });
+  const profileLink = p => location.href.split('#')[0] + '#/u/' + p.username;
+
+  async function startSession() {
+    const { data, error } = await sb.from('profiles').select('*').eq('id', state.user.id).maybeSingle();
+    if (error) {
+      // banco ainda sem a parte de perfis: segue só com a própria estante
+      state.social = false; state.me = null; $('#tab-people').hidden = true; $('#editProfile').hidden = true;
+      return openOwn();
+    }
+    state.social = true; $('#tab-people').hidden = false; $('#editProfile').hidden = false;
+    if (!data) return openSetup(false);
+    state.me = data;
+    await loadFollowing();
+    route();
+  }
+
+  function openSetup(editing) {
+    const me = state.me || {};
+    $('#setupTitle').replaceChildren(editing ? 'Editar ' : 'Seu ', h('em', { text: 'perfil' }));
+    $('#setupIntro').textContent = editing ? 'Seu nome e seu @ aparecem para as outras pessoas do app.' : 'Escolha como as outras pessoas vão te encontrar no app.';
+    $('#p-name').value = me.name || ''; $('#p-user').value = me.username || ''; $('#p-bio').value = me.bio || '';
+    if (!editing && !me.username) {
+      const guess = (state.user.email || '').split('@')[0].toLowerCase().replace(/[^a-z0-9_.]/g, '').slice(0, 20);
+      if (guess.length >= 3) $('#p-user').value = guess;
+    }
+    $('#setupCancelWrap').hidden = !editing; setupMsg('');
+    showSetup();
+  }
+  function setupMsg(t) { const m = $('#setupMsg'); m.textContent = t || ''; m.hidden = !t; }
+  $('#p-user').addEventListener('input', e => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, ''); if (v !== e.target.value) e.target.value = v; });
+  $('#setupCancel').addEventListener('click', () => { showApp(); });
+  $('#editProfile').addEventListener('click', () => openSetup(true));
+  $('#setupForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = $('#p-name').value.trim(), username = $('#p-user').value.trim(), bio = $('#p-bio').value.trim();
+    if (!name) { setupMsg('Coloque seu nome.'); return; }
+    if (!USER_RE.test(username)) { setupMsg('O usuário precisa ter de 3 a 20 caracteres: letras minúsculas, números, ponto ou _.'); return; }
+    const btn = $('#setupBtn'); btn.disabled = true;
+    try {
+      const row = { id: state.user.id, name, username, bio };
+      const { data, error } = await sb.from('profiles').upsert(row).select().single();
+      if (error) throw error;
+      const first = !state.me; state.me = data; if (!readonly()) state.owner = data;
+      if (first) { await loadFollowing(); route(); } else { showApp(); renderProfileBar(); toast('Perfil salvo'); }
+    } catch (err) {
+      setupMsg(err && err.code === '23505' ? 'Esse @ já está em uso. Escolha outro.' : 'Não foi possível salvar agora. Tente de novo.');
+    } finally { btn.disabled = false; }
+  });
+
+  async function loadFollowing() {
+    const { data } = await sb.from('follows').select('following').eq('follower', state.user.id);
+    state.following = new Set((data || []).map(r => r.following));
+  }
+  async function counts(id) {
+    const [a, b] = await Promise.all([
+      sb.from('follows').select('follower', { count: 'exact', head: true }).eq('following', id),
+      sb.from('follows').select('following', { count: 'exact', head: true }).eq('follower', id)]);
+    return { followers: a.count || 0, following: b.count || 0 };
+  }
+  async function toggleFollow(p, btn) {
+    if (!p || p.id === state.user.id) return;
+    const on = state.following.has(p.id); if (btn) btn.disabled = true;
+    const { error } = on
+      ? await sb.from('follows').delete().eq('follower', state.user.id).eq('following', p.id)
+      : await sb.from('follows').insert({ follower: state.user.id, following: p.id });
+    if (btn) btn.disabled = false;
+    if (error) { toast('Não foi possível agora. Tente de novo.'); return; }
+    on ? state.following.delete(p.id) : state.following.add(p.id);
+    if (state.owner && state.owner.id === p.id) renderProfileBar();
+    if (state.tab === 'people') renderPeople();
+  }
+  const followBtn = p => {
+    const on = state.following.has(p.id);
+    const b = h('button', { class: 'btn small' + (on ? ' ghost' : ''), type: 'button', 'aria-pressed': String(on), text: on ? 'Seguindo' : 'Seguir' });
+    b.addEventListener('click', ev => { ev.stopPropagation(); toggleFollow(p, b); });
+    return b;
+  };
+
+  function openOwn() {
+    state.ownerId = state.user.id; state.owner = state.me;
+    afterOwnerChange();
+    subscribe();
+  }
+  async function openProfileByUsername(username) {
+    const { data } = await sb.from('profiles').select('*').eq('username', username).maybeSingle();
+    if (!data) { toast('Perfil @' + username + ' não encontrado'); return goHome(); }
+    if (data.id === state.user.id) return goHome();
+    state.ownerId = data.id; state.owner = data;
+    if (state.tab === 'people') state.tab = 'shelf';
+    afterOwnerChange();
+  }
+  function afterOwnerChange() {
+    closeBook(); state.books = new Map(); state.loaded = false;
+    showApp(); renderHeader(); renderProfileBar(); setTab(state.tab); renderShelf(); refresh();
+    window.scrollTo(0, 0);
+  }
+  function route() {
+    const m = location.hash.match(/^#\/u\/([a-z0-9_.]{3,20})$/);
+    if (m && state.social) openProfileByUsername(m[1]); else openOwn();
+  }
+  function goHome() { if (location.hash) history.pushState(null, '', location.pathname); if (readonly() || !state.ownerId) openOwn(); }
+  function goProfile(p) { if (p.id === state.user.id) return goHome(); location.hash = '#/u/' + p.username; }
+  window.addEventListener('hashchange', () => { if (state.user && state.social) route(); });
+
+  function renderHeader() {
+    const t = $('#brandTitle');
+    if (readonly()) t.replaceChildren('Estante de ', h('em', { text: firstName(state.owner) }));
+    else t.replaceChildren('Diário de ', h('em', { text: 'leituras' }));
+    $('#addBtn').hidden = readonly();
+    document.title = readonly() ? 'Estante de ' + firstName(state.owner) : 'Diário de Leituras';
+  }
+  async function renderProfileBar() {
+    const bar = $('#profileBar');
+    const p = state.owner;
+    if (!state.social || !p) { bar.hidden = true; return; }
+    const ro = readonly();
+    const stats = h('span', { class: 'pb-stats', text: ' ' });
+    bar.replaceChildren(...[
+      ro ? h('button', { class: 'linkish back', type: 'button', onclick: goHome, text: '← Minha estante' }) : null,
+      h('div', { class: 'pb-main' }, avatar(p, true),
+        h('div', { class: 'pb-id' },
+          h('div', { class: 'pb-name' }, p.name || p.username, h('span', { class: 'pb-user', text: '@' + p.username })),
+          p.bio ? h('div', { class: 'pb-bio', text: p.bio }) : null,
+          stats),
+        ro ? followBtn(p) : h('button', { class: 'btn ghost small', type: 'button', onclick: () => shareProfile(p), text: 'Copiar link do perfil' }))].filter(Boolean));
+    bar.hidden = false;
+    const c = await counts(p.id);
+    if (state.owner !== p) return;
+    stats.textContent = `${c.followers} ${c.followers === 1 ? 'seguidor' : 'seguidores'} · ${c.following} seguindo`;
+  }
+  async function shareProfile(p) {
+    const url = profileLink(p);
+    try { await navigator.clipboard.writeText(url); toast('Link copiado: ' + url); }
+    catch (e) { toast(url); }
+  }
+
+  async function loadPeople() {
+    const box = $('#peopleList');
+    if (!state.people.length) box.replaceChildren(h('p', { class: 'saved', text: 'Carregando pessoas…' }));
+    const { data, error } = await sb.from('profiles').select('id,username,name,bio').order('name', { ascending: true }).limit(500);
+    if (error) { box.replaceChildren(h('p', { class: 'saved', text: 'Não consegui carregar as pessoas agora.' })); return; }
+    state.people = data || [];
+    await loadFollowing();
+    renderPeople();
+  }
+  function renderPeople() {
+    const q = $('#peopleSearch').value.trim().toLowerCase().replace(/^@/, '');
+    const norm = t => (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const others = state.people.filter(p => p.id !== state.user.id && (!q || norm(p.name).includes(norm(q)) || p.username.includes(q)));
+    const row = p => h('div', { class: 'person', role: 'button', tabindex: '0', onclick: () => goProfile(p), onkeydown: e => { if (e.key === 'Enter') goProfile(p); } },
+      avatar(p), h('div', { class: 'person-id' }, h('div', { class: 'pn', text: p.name || p.username }), h('div', { class: 'pu', text: '@' + p.username + (p.bio ? ' · ' + p.bio : '') })),
+      followBtn(p));
+    const mine = others.filter(p => state.following.has(p.id)), rest = others.filter(p => !state.following.has(p.id));
+    const box = $('#peopleList'); box.replaceChildren();
+    if (!others.length) { box.append(h('p', { class: 'saved', text: q ? 'Ninguém encontrado com essa busca.' : 'Ainda não há outras pessoas no app. Mande o link para quem você quiser chamar.' })); return; }
+    if (mine.length) box.append(h('h3', { class: 'sec-h', text: 'Quem você segue' }), ...mine.map(row));
+    if (rest.length) box.append(h('h3', { class: 'sec-h', text: mine.length ? 'Outras pessoas' : 'Pessoas no app' }), ...rest.map(row));
+  }
+  $('#peopleSearch').addEventListener('input', renderPeople);
+
   /* ---------- abas e controles ---------- */
   function setTab(t) {
+    if (t === 'people' && state.user && !state.social) t = 'shelf';
     state.tab = t; saveUi();
     $('#tab-shelf').setAttribute('aria-selected', String(t === 'shelf'));
     $('#tab-year').setAttribute('aria-selected', String(t === 'year'));
-    $('#view-shelf').hidden = t !== 'shelf'; $('#view-year').hidden = t !== 'year';
+    $('#tab-people').setAttribute('aria-selected', String(t === 'people'));
+    $('#view-shelf').hidden = t !== 'shelf'; $('#view-year').hidden = t !== 'year'; $('#view-people').hidden = t !== 'people';
     if (t === 'year') renderYear();
+    if (t === 'people') loadPeople();
   }
   $('#tab-shelf').addEventListener('click', () => setTab('shelf'));
   $('#tab-year').addEventListener('click', () => setTab('year'));
+  $('#tab-people').addEventListener('click', () => { if (readonly()) goHome(); setTab('people'); });
   $('#sort').addEventListener('change', e => { state.sort = e.target.value; saveUi(); renderShelf(); });
   $('#year').addEventListener('change', e => { state.year = Number(e.target.value); saveUi(); renderShelf(); if (state.tab === 'year') renderYear(); });
   $('#addBtn').addEventListener('click', addBook);
@@ -519,7 +683,8 @@
     try { await sb.auth.signOut({ scope: 'local' }); } catch (e) {}
     // garante a volta para a tela de entrada mesmo se o aviso do Supabase não chegar
     if (state.channel) { try { sb.removeChannel(state.channel); } catch (e) {} state.channel = null; }
-    state.user = null; state.books = new Map(); closeBook(); showLogin();
+    state.user = null; state.me = null; state.ownerId = null; state.owner = null; state.following = new Set(); state.books = new Map(); closeBook(); showLogin();
+    if (location.hash) history.replaceState(null, '', location.pathname);
     $('#password').value = ''; loginMsg('');
   });
 
@@ -560,10 +725,11 @@
     finally { btn.disabled = false; }
   });
 
-  function showLogin() { $('#app').hidden = true; $('#login').hidden = false; }
-  function showApp() { $('#login').hidden = true; $('#app').hidden = false; }
+  function showLogin() { $('#app').hidden = true; $('#setup').hidden = true; $('#login').hidden = false; }
+  function showApp() { $('#login').hidden = true; $('#setup').hidden = true; $('#app').hidden = false; }
+  function showSetup() { $('#login').hidden = true; $('#app').hidden = true; $('#setup').hidden = false; }
 
-  setTab(state.tab);
+  setTab(state.tab === 'people' ? 'shelf' : state.tab);
 
   if (!sb) {
     showLogin();
@@ -576,7 +742,7 @@
     const u = session ? session.user : null;
     if (u && (!state.user || state.user.id !== u.id)) {
       state.user = u; $('#whoami').textContent = u.email || '';
-      showApp(); state.loaded = false; renderShelf(); refresh(); subscribe();
+      startSession();
     } else if (!u && state.user !== null) {
       state.user = null; state.books = new Map(); if (state.channel) sb.removeChannel(state.channel);
       showLogin();

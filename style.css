@@ -272,3 +272,31 @@ body{font-size:14.5px;letter-spacing:-.005em}
 .q p,.qitem blockquote,.quote-of{font-style:normal;font-weight:300;font-size:16.5px;line-height:1.55;letter-spacing:-.005em}
 .book .t{font-size:13px;letter-spacing:-.01em}
 .v-text p{font-size:15px;line-height:1.75}
+
+/* perfil, pessoas e seguir */
+.avatar{flex:0 0 auto;width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  background:var(--pink);color:#3F2117;font-weight:600;font-size:16px}
+.avatar.big{width:52px;height:52px;font-size:22px}
+.profile-bar{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+.profile-bar .back{align-self:flex-start;font-size:13.5px}
+.pb-main{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pb-id{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 200px}
+.pb-name{font-weight:600;font-size:16px;color:var(--heading);display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.pb-user{font-weight:400;font-size:13.5px;color:var(--muted)}
+.pb-bio{font-size:13.5px;color:var(--fg)}
+.pb-stats{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;min-height:1em}
+.tabs{flex-wrap:wrap;row-gap:0}
+.search{width:100%;max-width:420px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:10px 16px;font-size:15px;margin-bottom:18px}
+.people{display:flex;flex-direction:column;gap:6px;max-width:640px}
+.people .sec-h{margin:14px 0 4px}
+.person{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--line);cursor:pointer}
+.person:hover{border-color:var(--argila)}
+.person-id{flex:1 1 auto;min-width:0}
+.person .pn{font-weight:600;color:var(--heading)}
+.person .pu{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.at-field{display:flex;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:10px;margin-top:4px;padding-left:12px}
+.at-field span{color:var(--muted);font-size:16px}
+.at-field input{border:0!important;margin:0!important;background:transparent!important;padding-left:4px!important}
+.login-card .hint{font-size:12.5px;margin-top:6px}
+.login-card .opt{text-transform:none;letter-spacing:0;font-weight:400}
+.foot-actions{display:flex;gap:16px}
