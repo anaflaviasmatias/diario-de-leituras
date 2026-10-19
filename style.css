@@ -300,3 +300,4 @@ body{font-size:14.5px;letter-spacing:-.005em}
 .login-card .hint{font-size:12.5px;margin-top:6px}
 .login-card .opt{text-transform:none;letter-spacing:0;font-weight:400}
 .foot-actions{display:flex;gap:16px}
+.toast{max-width:calc(100% - 32px);text-align:center;border-radius:14px;line-height:1.4}

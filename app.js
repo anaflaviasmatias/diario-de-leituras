@@ -96,7 +96,7 @@
   }
   function miniStars(n) { return starsRow(n || 0, 'mini-stars'); }
   let toastT;
-  function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2800); }
+  function toast(msg, ms = 2800) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
   function notice(msg) { const n = $('#notice'); n.textContent = msg || ''; n.hidden = !msg; }
 
   /* ---------- gravação com fila por livro ---------- */
@@ -439,15 +439,22 @@
   async function changeCover(id, f) {
     if (!f) return;
     setSaved('Enviando capa…');
-    try {
-      const blob = await toCoverJpeg(f);
-      const path = `${state.user.id}/${id}-${Date.now()}.jpg`;
-      const { error } = await sb.storage.from('capas').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
-      if (error) throw error;
-      const { data } = sb.storage.from('capas').getPublicUrl(path);
-      patch(id, { coverUrl: data.publicUrl }, 0);
-      $('#coverBox').replaceChildren(coverEl(state.books.get(id)));
-    } catch (e) { setSaved('Capa não enviada'); toast('Não deu para enviar essa imagem. Tente uma foto JPG ou PNG.'); }
+    let blob;
+    try { blob = await toCoverJpeg(f); }
+    catch (e) { setSaved('Capa não enviada'); toast('Não consegui abrir essa imagem. Tente tirar um print da capa e enviar o print.'); return; }
+    const path = `${state.user.id}/${id}-${Date.now()}.jpg`;
+    const { error } = await sb.storage.from('capas').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+    if (error) {
+      setSaved('Capa não enviada');
+      const msg = String(error.message || error.error || error.statusCode || 'erro desconhecido');
+      toast(/row-level security|policy|unauthorized|403/i.test(msg) ? 'O banco recusou a capa (permissão). Erro: ' + msg : /bucket not found/i.test(msg) ? 'A pasta de capas não existe no banco. Erro: ' + msg : 'Não consegui enviar a capa. Erro: ' + msg, 8000);
+      return;
+    }
+    const { data } = sb.storage.from('capas').getPublicUrl(path);
+    patch(id, { coverUrl: data.publicUrl }, 0);
+    const box = $('#coverBox'); if (box) box.replaceChildren(coverEl(state.books.get(id)));
+    // permite escolher a mesma foto de novo
+    const inp = $('#coverFile'); if (inp) inp.value = '';
   }
   function toCoverJpeg(file) {
     return new Promise((res, rej) => {

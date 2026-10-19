@@ -98,3 +98,7 @@ grant select, insert, delete on public.follows to authenticated;
 drop policy if exists "ver meus livros" on public.books;
 drop policy if exists "ver livros de quem tem conta" on public.books;
 create policy "ver livros de quem tem conta" on public.books for select to authenticated using (true);
+
+-- 4. Capas: leitura da pasta pelo app (necessária para trocar capas)
+drop policy if exists "ver capas" on storage.objects;
+create policy "ver capas" on storage.objects for select to authenticated using (bucket_id = 'capas');
