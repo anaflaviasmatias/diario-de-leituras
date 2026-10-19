@@ -74,8 +74,16 @@
   const fmtNota = r => String(r).replace('.', ',');
   const notaLabel = r => !r ? '' : Number.isInteger(r) ? NOTAS[r] : fmtNota(r) + ' de 5';
   // uma estrela que pode estar cheia, pela metade ou vazia
+  const STAR_PATH = 'M12 1.6l3.09 6.97 7.58.73-5.71 5.03 1.67 7.43L12 17.9l-6.63 3.86 1.67-7.43L1.33 9.3l7.58-.73z';
+  function starSvg() {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', STAR_PATH); path.setAttribute('fill', 'currentColor'); svg.append(path);
+    return svg;
+  }
   function star(fill) {
-    return h('span', { class: 'st', 'aria-hidden': 'true' }, '★', h('span', { class: 'st-fill', style: `width:${fill * 100}%`, text: '★' }));
+    return h('span', { class: 'st', 'aria-hidden': 'true' }, starSvg(), h('span', { class: 'st-fill', style: `width:${fill * 100}%` }, starSvg()));
   }
   function starsRow(r, cls) {
     const w = h('div', { class: cls, 'aria-label': r ? fmtNota(r) + ' de 5 estrelas' : 'sem nota' });
